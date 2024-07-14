@@ -1,0 +1,7 @@
+    1  sudo apt update && sudo apt upgrade
+    2  sudo apt install gcc
+    3  gcc -v
+    4  sudo apt install nasm
+    5  nasm -v
+    6  ls
+    7  history > history
