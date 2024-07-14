@@ -57,9 +57,9 @@ MessageLen: equ $-Message ;'$' the current assembly position.
 ;       '$$' is the begining of the current section.
 ;       '$-$$' represents the size from the start of the code to 
 ;        the end of the message.
-times (0x1be-($-$$)) db 0  //How many times db is repeated.
+times (0x1be-($-$$)) db 0  ;How many times db is repeated.
 
-    db 80h                 //Boot indicator [bootable partition].
+    db 80h                 ;Boot indicator [bootable partition].
     
     ;cylinder-head-sector (CHS): Addressing scheme allows the operating
     ;                            system to specify the exact location of 
