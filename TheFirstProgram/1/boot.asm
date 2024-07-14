@@ -1,14 +1,14 @@
-[BITS 16]       ///Directive: Boot code is running in 16=bit mode. (Push and pop
-                ///           instructions are 2 bytes in 16-bit mode.)
+[BITS 16]       //Directive: Boot code is running in 16=bit mode. (Push and pop
+                //           instructions are 2 bytes in 16-bit mode.)
 
 
-[ORG 0x7c00]    ///Directive:  BIOS loads the boot code from the first sector 
-                ///            into memory address 7c00
+[ORG 0x7c00]    //Directive:  BIOS loads the boot code from the first sector 
+                //            into memory address 7c00
 
 
-///Initilizing the segment registers and stack pointer.
-///            Zeroing out the segment registers makes the offset
-///            the memory address we want to access.
+//Initilizing the segment registers and stack pointer.
+//            Zeroing out the segment registers makes the offset
+//            the memory address we want to access.
 start:          //Label: Start of code
     xor ax,ax   //Zeroing ax register  
     mov ds,ax   //copying the value of ax into ds, ex, and ss.
@@ -17,8 +17,8 @@ start:          //Label: Start of code
     mov sp,0x7c00
 
 
-///Printing message to screen: Print characters is done by calling BIOS service
-///                            The BIOS services can be accessed with BIOS interrupts.
+//Printing message to screen: Print characters is done by calling BIOS service
+//                            The BIOS services can be accessed with BIOS interrupts.
 PrintMessage:
     mov ah,0x13 //Register ah holds the function code. Here we use 13 which means print string.
     mov al,1    //Register AL specifies the write mode, we set it to 1, meaning that the cursor 
@@ -48,28 +48,28 @@ End:    //End of code
 Message:    db "Hello"
 
 
-///equ: directive to define a constant message length. Represents the 
-///     number of characters. and copies it to register cx.
+//equ: directive to define a constant message length. Represents the 
+//     number of characters. and copies it to register cx.
 MessageLen: equ $-Message //'$' the current assembly position.
 
 
-///times: A direcective that repeats commands. 
-///       '$$' is the begining of the current section.
-///       '$-$$' represents the size from the start of the code to 
-///        the end of the message.
-times (0x1be-($-$$)) db 0   //How many times db is repeated.
+//times: A direcective that repeats commands. 
+//       '$$' is the begining of the current section.
+//       '$-$$' represents the size from the start of the code to 
+//        the end of the message.
+times (0x1be-($-$$)) db 0  //How many times db is repeated.
 
-    db 80h              //Boot indicator [bootable partition].
+    db 80h                 //Boot indicator [bootable partition].
     
-    ///cylinder-head-sector (CHS): Addressing scheme allows the operating
-    ///                            system to specify the exact location of 
-    ///                            data on a disk. 
-    ///
-    ///          The cylinder number specifies the vertical position of the track on all platters.
-    ///          The head number specifies which read/write head (and thus which platter surface) is being accessed.
-    ///          The sector number specifies the specific sector within the track where the data is located.
-    ///
-    ///Refer to definitions below.
+    //cylinder-head-sector (CHS): Addressing scheme allows the operating
+    //                            system to specify the exact location of 
+    //                            data on a disk. 
+    //
+    //          The cylinder number specifies the vertical position of the track on all platters.
+    //          The head number specifies which read/write head (and thus which platter surface) is being accessed.
+    //          The sector number specifies the specific sector within the track where the data is located.
+    //
+    //Refer to definitions below.
     db 0,2,0            //Starting CHS [Cylinder, Head, Sector]
     db 0f0h             //Type
     db 0ffh,0ffh,0ffh   //Ending CHS
