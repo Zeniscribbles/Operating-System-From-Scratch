@@ -81,5 +81,3 @@ times (0x1be-($-$$)) db 0   //How many times db is repeated.
     //Signature, size of boot 512 bytes.
     db 0x55
     db 0xaa
-
-	
