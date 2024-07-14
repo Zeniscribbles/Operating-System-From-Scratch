@@ -83,17 +83,3 @@ times (0x1be-($-$$)) db 0   //How many times db is repeated.
     db 0xaa
 
 	
-///Cylinder: A cylinder is a set of tracks located at the same position on all the 
-///         platters of a hard disk.Cylinders are important for data access because 
-///         they allow the read/write heads to access the same track on all platters 
-///         without having to move, reducing seek time.
-
-///Head: The head is the part of the disk drive that reads from and writes data to 
-///      the disk platters. Each platter has two surfaces, each of which has a 
-///      dedicated read/write head. 
-
-///Sector: sector is the smallest unit of data storage on a disk. Sectors are 
-///        subdivisions of a track and traditionally are 512 bytes in size,
-///        though modern disks may use larger sector sizes, such as 
-///        4096 bytes (4 KB). Data is read from and written to disks in 
-///        sector-sized chunks.
