@@ -17,40 +17,53 @@ start:          ;Label: Start of code
     mov sp,0x7c00
 
 
-;Printing message to screen: Print characters is done by calling BIOS service
-;                            The BIOS services can be accessed with BIOS interrupts.
-PrintMessage:
-    mov ah,0x13 ;Register ah holds the function code. Here we use 13 which means print string.
-    mov al,1    ;Register AL specifies the write mode, we set it to 1, meaning that the cursor 
-                ;will be placed at the end of the string.
-    mov bx,0xa  ;Save A to bx.
-
-                ;Bh which is the higher part of bx register represents page number.
-                ;BL, the lower part of bx holds the information of character attributes.
+TestDiskExtension:
+    mov [DriveID],dl
+    mov ah,0x41
+    mov bx,0x55aa
+    int 0x13
+    jc NotSupport
+    cmp bx,0xaa55
+    jne NotSupport
 
 
-    xor dx,dx   ;Zero dx register
+;Loading the loader:
+LoadLoader:                 ;The ReadPacket/DriveID Structure:
+    mov si,ReadPacket       ;0. Moving the address of ReadPacket to si register.
+    mov word[si],0x10       ;1. Structure length 0x10 [16d]
+    mov word[si+2],5        ;2. Number of sectors we want to read [5 sectors, small but enough space for loader].
+    mov word[si+4],0x7e00   ;3. Memory location that file is read into [The Offset of address].
+    mov word[si+6],0        ;4. Memory location that file is read into [The Segment of address].
+    mov dword[si+8],1       ;Lower half of 64-bit logical block address.
+    mov dword[si+0xc],0     ;Higher half of 64-bit logical block address.
+    mov dl,[DriveID]        ;Saving the DriveID before calling DES.
+    mov ah,0x42             ;Function code 0x42 in ah (Disk Extension Service).
+    int 0x13                ;interupt 13.
+    jc  ReadError           ;If interrupt 13 fails
 
-                ;We also zero register dx. Dh which is higher part of dx register 
-                ;represents rows and dL represents columns.
-                ;Now the message will print at the begining of the screen.
+    mov dl,[DriveID]        ;Passing DriveID to loader.Kernal file is loaded using DriveID
+    jmp 0x7e00              ;Jump to memory where loader file is loaded from disk
 
-    mov bp, Message ;bp holds the address of the screen. Placing brackets around 'Message'
-                    ;will copy the data in the variable 'message' to bp.
-
-    mov cx, MessageLen ;Number of characters to print.
-    int 0x10           ;Print Function: Calling the interrupt BIOS service [hexdecimal 10]
+;Replacing the print message with ReadError Message
+ReadError:
+NotSupport:
+    mov ah,0x13
+    mov al,1
+    mov bx,0xa
+    xor dx,dx
+    mov bp,Message
+    mov cx,MessageLen 
+    int 0x10
 
 End:    ;End of code
     hlt ;Processor is placed in halt state.    
     jmp End
-     
-Message:    db "Hello"
 
 
-;equ: directive to define a constant message length. Represents the 
-;     number of characters. and copies it to register cx.
-MessageLen: equ $-Message ;'$' the current assembly position.
+DriveID:    db 0
+Message:    db "We have an error in boot process"   
+MessageLen: equ $-Message
+ReadPacket: times 16 db 0       ;A Structure for DriveID to be passed.
 
 
 ;times: A direcective that repeats commands. 

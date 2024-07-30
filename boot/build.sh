@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#Make sure to change from CLRF to LF [end of line sequence]
 # Ensure that boot.asm exists
 if [ ! -f boot.asm ]; then
   echo "'boot.asm' not found in the current directory."
