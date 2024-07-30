@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Ensure that boot.asm and loader.asm exist
 if [ ! -f boot.asm ]; then
   echo "'boot.asm' not found in the current directory."
@@ -42,9 +43,11 @@ if [ -f boot.img ]; then
   rm -f boot.img
 fi
 
-# Create a 512-byte image file
-echo "Creating bootable image..."
-dd if=/dev/zero of=boot.img bs=512 count=1  # Create a blank 512-byte image
+# Create a 10MB image file
+IMAGE_SIZE_MB=10
+IMAGE_SIZE_BYTES=$((IMAGE_SIZE_MB * 1024 * 1024))
+echo "Creating a ${IMAGE_SIZE_MB}MB bootable image..."
+dd if=/dev/zero of=boot.img bs=512 count=$((IMAGE_SIZE_BYTES / 512))  # Create a blank image of the correct size
 if [ $? -ne 0 ]; then
   echo "Failed to create boot.img."
   exit 1
