@@ -10,6 +10,7 @@ fi
 # Assemble the boot.asm file to a binary file
 echo "Assembling boot.asm..."
 nasm -f bin -o boot.bin boot.asm
+nasm -f bin -o loader.bin loader.asm
 
 # Check if nasm was successful
 if [ $? -ne 0 ]; then
@@ -26,6 +27,7 @@ fi
 # Create a bootable image from the binary file
 echo "Creating bootable image..."
 dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
+dd if=loader.bin of=boot.img bs=512 count=5 seek=1 conv=notrunc
 
 # Check if dd was successful
 if [ $? -ne 0 ]; then
