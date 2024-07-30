@@ -1,3 +1,5 @@
+; ;This is where the operating system starts...where it all begins...
+
 [BITS 16]       ;Directive: Boot code is running in 16=bit mode. (Push and pop
                 ;           instructions are 2 bytes in 16-bit mode.)
 
