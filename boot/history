@@ -1,1 +1,21 @@
     1  history > history
+    2  git status
+    3  git status
+    4  git commit -m "Changes made to boot.asm file to include the loader. Replacing "Hello World" message with appropriate error message for loader failure. 
+ git commit -m "Changes made to boot.asm file to include the loader. Replacing "Hello World" message with appropriate error message for loader failure." 
+git status
+    5  git status
+    6  git push
+    7  clear
+    8  git status
+    9  git push
+   10  git status
+   11  clear
+   12  history>history
+   13  git status
+   14  git add. boot.asm
+   15  git add boot.asm
+   16  git add history
+   17  git status
+   18  git status
+   19  history>history

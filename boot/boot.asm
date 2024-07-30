@@ -16,15 +16,16 @@ start:          ;Label: Start of code
     mov ss,ax
     mov sp,0x7c00
 
-
+;TestDiskExtension: performing a BIOS interrupt call to check if the BIOS supports 
+;                   extended disk access functions. 
 TestDiskExtension:
-    mov [DriveID],dl
-    mov ah,0x41
-    mov bx,0x55aa
-    int 0x13
-    jc NotSupport
-    cmp bx,0xaa55
-    jne NotSupport
+    mov [DriveID],dl        ;Save the drive number in the memory location DriveID
+    mov ah, 0x41            ; Set AH to 0x41 (Check Extensions Supported)
+    mov bx,0x55aa           ;Set BX to 0x55aa (Magic number)
+    int 0x13                ;Call BIOS Disk Service
+    jc NotSupport           ;ERROR: The carryflag is set after int 0x13.Jump to NotSupport.
+    cmp bx,0xaa55           ;Check if BX equals 0xaa55 (indicates support)
+    jne NotSupport          ;Jump to NotSupport if BX is not 0xaa55
 
 
 ;Loading the loader:
