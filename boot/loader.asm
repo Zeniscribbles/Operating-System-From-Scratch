@@ -85,14 +85,28 @@ SetA20LineDone:
     xor ax, ax              ;Zero out ax
     mov es, ax              ;Zero out es
 
-    ;Display success message indicating that the A20 line is enabled.
-    mov ah,0x13             ;Set AH to 0x13 (write string function).      
-    mov al,1                ;Set AL to 1 (write mode).
-    mov bx,0xa              ;Set BX to page number 0xa.
-    xor dx,dx               ;Clear DX (row and column).
-    mov bp, Message         ;Load the address of the message into BP.
-    mov cx, MessageLen      ;Set CX to the length of the message.
-    int 0x10                ;Call BIOS interrupt 0x10 to display the message.
+SetVideoMode:
+    mov ax, 0x0003          ;Set ax to 0x0003 (80x25 text mode).
+    int 0x10                ;Call BIOS interrupt 0x10 to set video mode.
+
+    mov si, Message         ;Load the address of the message into si register.
+    mov ax, 0xb800          ;Set ax to 0xB800, which is the base address of the video memory in text mode.
+    mov es, ax              ;Move the value in ax (0xB800) to es register, setting es to the video memory segment.
+    xor di, di              ;Clear di register (set to 0). di will be used as an offset into the video memory.
+
+    mov cx, MessageLen      ;Setting cx the loop counter to MessageLen
+
+PrintMessage:
+    mov al, [si]            ;Load the next character from the message.
+    mov [es:di], al         ;Write the character to video memory.
+    mov byte[es:di+1], 0xa  ;Write the color attribute (bright green) to the next byte.
+
+
+    add di, 2               ;Move to the next video memory cell (2 bytes per character)
+    add si, 1               ;Move to the next character in the message
+    loop PrintMessage       ;Continue until CX (MessageLen) is zero
+
+
 
 
 ReadError:
@@ -103,7 +117,7 @@ End:
 
 
 DriveID:    db 0                        ;Variable to store the drive ID.
-Message:    db "A20 Line is on"         ;Success message string.
+Message:    db "Text mode is set"       ;Success message string.
 MessageLen: equ $-Message               ;Length of the success message string.
 ReadPacket: times 16 db 0               ;Define 16 bytes, each initialized to 0.
 
