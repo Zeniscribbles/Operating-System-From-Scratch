@@ -21,7 +21,7 @@ start:
     test edx, (1<<26)   ;Checking if bit 26 of edx is set.
     jz NotSupport       ;1 GB page support Not Supported [zero flag set].
 
-;Set up the Disk Address Packet (DAP) for extended read
+;Loading the Kernel into memeory
 LoadKernal:
     mov si, ReadPacket      ;Load the address of ReadPacket into SI.
     mov word[si], 0x10      ;Set the size of the packet structure to 16 bytes.
@@ -56,15 +56,6 @@ GetMemoryInfo:
     jnz GetMemoryInfo     ;If not zero, continue to get more memory info.
 
 GetMemoryDone:
-    mov ah,0x13             ;Set AH to 0x13 (write string function).      
-    mov al,1                ;Set AL to 1 (write mode).
-    mov bx,0xa              ;Set BX to page number 0xa.
-    xor dx,dx               ;Clear DX (row and column).
-    mov bp, Message         ;Load the address of the message into BP.
-    mov cx, MessageLen      ;Set CX to the length of the message.
-    int 0x10                ;Call BIOS interrupt 0x10 to display the message.
-
-
 ;Test if the A20 lineis enabled:
 ;        The A20 line: Also known as the A20 gate, is a legacy hardware feature in 
 ;        x86 architecture that controls access to the 21st address line (A20) of the 
@@ -89,25 +80,15 @@ SetVideoMode:
     mov ax, 0x0003          ;Set ax to 0x0003 (80x25 text mode).
     int 0x10                ;Call BIOS interrupt 0x10 to set video mode.
 
-    mov si, Message         ;Load the address of the message into si register.
-    mov ax, 0xb800          ;Set ax to 0xB800, which is the base address of the video memory in text mode.
-    mov es, ax              ;Move the value in ax (0xB800) to es register, setting es to the video memory segment.
-    xor di, di              ;Clear di register (set to 0). di will be used as an offset into the video memory.
+    cli                     ;Clear interrupt flag. Processor will not respond to interrupt.
+    lgdt [Gdt32Ptr]         ;Load GDT adress and size [16 bits in 16-bit mode].
+    lidt [Idt32Ptr]         ;Load IDT address and size. 
 
-    mov cx, MessageLen      ;Setting cx the loop counter to MessageLen
+    mov eax, cr0
+    or eax, 1
+    mov cr0, eax
 
-PrintMessage:
-    mov al, [si]            ;Load the next character from the message.
-    mov [es:di], al         ;Write the character to video memory.
-    mov byte[es:di+1], 0xa  ;Write the color attribute (bright green) to the next byte.
-
-
-    add di, 2               ;Move to the next video memory cell (2 bytes per character)
-    add si, 1               ;Move to the next character in the message
-    loop PrintMessage       ;Continue until CX (MessageLen) is zero
-
-
-
+    jmp  8:PmEntry
 
 ReadError:
 NotSupport:
@@ -116,9 +97,23 @@ End:
     jmp End     ;Infinite loop to prevent execution past the end.
 
 
+[BITS 32]
+PmEntry:
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    mov esp, 0x7c00
+
+    mov byte[0xb8000], 'P'
+    mov byte[0xb8001], 0xa
+
+PEnd: 
+    hlt
+    jmp End
+
+
 DriveID:    db 0                        ;Variable to store the drive ID.
-Message:    db "Text mode is set"       ;Success message string.
-MessageLen: equ $-Message               ;Length of the success message string.
 ReadPacket: times 16 db 0               ;Define 16 bytes, each initialized to 0.
 
 ;Data structure for the extended read function. 
@@ -131,3 +126,46 @@ ReadPacket: times 16 db 0               ;Define 16 bytes, each initialized to 0.
 ;0x06	2	Segment of the target address
 ;0x08	4	Starting LBA (Low 32 bits)
 ;0x0C	4	Starting LBA (High 32 bits)
+
+
+;Defining the GDT [Global Descriptor Table]
+Gdt32:
+    dq 0        ;The first GDT entry is always zero, "null descriptor".
+                ;It is required by the x86 architecture. It occupies 8 bytes and is used
+                ;to prevent accidental use of a null selector.
+
+;Code Segment Descriptor:
+code32:
+    dw 0xffff   ;Segment limit (lower 16 bits). Set to 0xFFFF, defining the segment's maximum size (4 GB).
+    dw 0        ;Base address (lower 16 bits). Set to 0x0000, meaning the code segment starts at address 0x00000000.
+    db 0        ;Base address (middle 8 bits). Also set to 0, continuing the base address from the previous line.
+    db 0x9a     ;Access byte:
+                ;- 1st nibble (9): Sets the segment as a code segment (bit 3), executable (bit 2), readable (bit 1),
+                ;accessed (bit 0), and DPL (Descriptor Privilege Level) to 0 (highest privilege).
+                ;- 2nd nibble (A): Sets the segment as present (bit 7), and enables the default operation size to 32-bit (bit 6).
+    db 0xcf     ;0xcf [hexadecimal] 110111
+    db 0        ;Base address (upper 8 bits) Set to 0x0000
+
+;Data Segement Descriptor: 
+Data32:
+dw 0xffff   ;Segment limit (lower 16 bits). Set to 0xFFFF, defining the segment's maximum size (4 GB).
+    dw 0        ;Base address (lower 16 bits). Set to 0x0000, meaning the code segment starts at address 0x00000000.
+    db 0        ;Base address (middle 8 bits). Also set to 0, continuing the base address from the previous line.
+    db 0x92     ;Access byte: Readable and Writable
+                ;- 1st nibble (9): Sets the segment as a code segment (bit 3), executable (bit 2), readable (bit 1),
+                ;accessed (bit 0), and DPL (Descriptor Privilege Level) to 0 (highest privilege).
+                ;- 2nd nibble (A): Sets the segment as present (bit 7), and enables the default operation size to 32-bit (bit 6).
+    db 0xcf     ;0xcf [hexadecimal] 110111
+    db 0         ;Base address (upper 8 bits) Set to 0x0000
+
+;Calculating the length of the descriptor table:
+Gdt32Len: equ $-Gdt32       ;Length of table: Forst two bytes and address of gdt to the next four bytes.
+
+Gdt32Ptr: dw Gdt32Len-1     ;Size of GDT minus one [2 bytes]
+          dd Gdt32          ;Address of GDT [4 bytes].
+
+        
+Idt32Ptr: dw 0  ;Set to zero to avoid interrupts before entering long mode
+          dd 0  ;The reason is that non-maskable interrupts indicate that 
+                ;non-recoverable hardware errors such as ram error, there is no
+                ;need to boot our system if errors occur.
