@@ -1,4 +1,5 @@
 #!/bin/bash
+#End of Line Sequence: Set to CRLF
 
 # Ensure that boot.asm and loader.asm exist
 if [ ! -f boot.asm ]; then

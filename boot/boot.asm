@@ -1,5 +1,7 @@
-; ;This is where the operating system starts...where it all begins...
+; ;This is where the operating system starts...where the wild things are...
 
+
+;End of Line Sequence: Set to CRLF
 [BITS 16]       ;Directive: Boot code is running in 16=bit mode. (Push and pop
                 ;           instructions are 2 bytes in 16-bit mode.)
 

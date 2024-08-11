@@ -1,3 +1,5 @@
+; End of Line Sequence: Set to CRLF
+
 [BITS 16]       ;Directive: Boot code is running in 16=bit mode. [Push and pop
                 ;           instructions are 2 bytes in 16-bit mode.]
 
@@ -16,7 +18,7 @@ start:
 
     mov eax, 0x80000001 ;Input value: Processor Features.
     cpuid
-    test edx, [1<<29]   ;Checking if bit 29  of edx is set.
+    test edx, [1<<29]   ;Checking if bit 29 of edx is set.
     jz NotSupport       ;Long mode not supported [zero flag set].
     test edx, [1<<26]   ;Checking if bit 26 of edx is set.
     jz NotSupport       ;1 GB page support Not Supported [zero flag set].
