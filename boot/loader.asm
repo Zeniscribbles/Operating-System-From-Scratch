@@ -26,7 +26,7 @@ start:
     jz NotSupport       ;1 GB page support Not Supported [zero flag set].
 
 ;Loading the Kernel into memeory
-LoadKernal:
+LoadKernel:
     mov si, ReadPacket      ;Load the address of ReadPacket into SI.
     mov word[si], 0x10      ;Set the size of the packet structure to 16 bytes.
     mov word[si+2], 100     ;Set the number of sectors to read [100 sectors, 50 KB].
@@ -108,7 +108,6 @@ End:
 
 
 [BITS 32]       ;Indicate that the following code is in 32-bit mode [protected mode].
-
 PmEntry:
     mov ax, 0x10            ;Load 0x10 into AX. This value is the selector for the data segment in the GDT. 
                             ;It corresponds to the second descriptor in the GDT [index 2, as 0x10 >> 3 = 2], 
@@ -132,13 +131,13 @@ PmEntry:
 ;                                instead. Free memory for converting virtual address to 
 ;                                physical address.
     cld
-    mov edi, 0x80000
+    mov edi, 0x70000
     xor eax, eax
     mov ecx, 0x10000/4
     rep stosd
 
-    mov dword[0x80000], 0x81007
-    mov dword[0x81000], 10000111b
+    mov dword[0x70000], 0x71007
+    mov dword[0x71000], 10000111b
 
     lgdt [Gdt64Ptr]
 
@@ -146,7 +145,7 @@ PmEntry:
     or  eax, (1<<5)
     mov cr4, eax
 
-    mov eax, 0x80000
+    mov eax, 0x70000
     mov cr3, eax
 
     mov ecx, 0xc0000080
@@ -181,8 +180,6 @@ LMEntry:
 LEnd:
     hlt                     ;Halt the CPU after setting up protected mode. 
     jmp End                 ;Enter an infinite loop, ensuring the CPU remains halted and does not execute any unintended instructions.
-
-
 
 
 
