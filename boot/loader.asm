@@ -1,4 +1,6 @@
-; End of Line Sequence: Set to CRLF
+; ; This is the loader...think, think, think
+
+;End of Line Sequence: Set to CRLF
 
 [BITS 16]       ;Directive: Boot code is running in 16=bit mode. [Push and pop
                 ;           instructions are 2 bytes in 16-bit mode.]
@@ -125,16 +127,67 @@ PmEntry:
                             ;This is typically where the bootloader was loaded, and setting the stack here is convenient 
                             ;for continuing operations in protected mode.
 
-    mov byte [0xb8000], 'P' ;Move the character 'P' [ASCII value] into the video memory at address 0xB8000. 
-                            ;This is the beginning of the text-mode video memory for VGA, where characters are displayed on screen.
-                            ;This should display the character 'P' at the top-left corner of the screen.
+;Setting up and enabling paging: The addresses [0x80000 - 0x90000] may be used for
+;                                BIOS data. We can use memory area from 0x70000 to 0x80000
+;                                instead. Free memory for converting virtual address to 
+;                                physical address.
+    cld
+    mov edi, 0x80000
+    xor eax, eax
+    mov ecx, 0x10000/4
+    rep stosd
 
-    mov byte [0xb8001], 0xa ;Move the attribute byte 0x0A into the next byte at 0xB8001. 
-                            ;This sets the foreground and background color of the 'P' character to bright green on black.
+    mov dword[0x80000], 0x81007
+    mov dword[0x81000], 10000111b
+
+    lgdt [Gdt64Ptr]
+
+    mov eax, cr4
+    or  eax, (1<<5)
+    mov cr4, eax
+
+    mov eax, 0x80000
+    mov cr3, eax
+
+    mov ecx, 0xc0000080
+    rdmsr
+    or eax, (1<<8)
+    wrmsr
+
+    ;Enable paging
+    mov eax, cr0
+    or  eax, (1<<31)
+    mov cr0, eax
+
+    jmp 8:LMEntry
 
 PEnd: 
     hlt                     ;Halt the CPU after setting up protected mode. 
     jmp End                 ;Enter an infinite loop, ensuring the CPU remains halted and does not execute any unintended instructions.
+
+
+[BITS 64]       ;Indicate that the following code is in 64-bit mode [jumping to the kernel].
+LMEntry:
+    mov rsp, 0x7c00
+
+    mov byte[0xb8000], 'L'
+    mov byte[0xb8001], 0xa
+
+
+    ;cld                 ;Clear direction flag, processing data from low to high memory addresses.
+    ;mov rdi, 0x200000   ;Destination address
+    ;mov rsi, 0x100000   ;Source addresss
+    ;mov rcx, 51200/8    ;RCX acts as a counter, move instruction will execute multiple times
+    ;repeat movsq
+    ;jmp 0x200000        ;Execution transferred to the kernel.
+
+
+LEnd:
+    hlt                     ;Halt the CPU after setting up protected mode. 
+    jmp End                 ;Enter an infinite loop, ensuring the CPU remains halted and does not execute any unintended instructions.
+
+
+
 
 
 DriveID:    db 0                        ;Variable to store the drive ID.
@@ -193,3 +246,13 @@ Idt32Ptr: dw 0  ;Set to zero to avoid interrupts before entering long mode
           dd 0  ;The reason is that non-maskable interrupts indicate that 
                 ;non-recoverable hardware errors such as ram error, there is no
                 ;need to boot our system if errors occur.
+
+
+Gdt64:  
+    dq 0
+    dq 0x0020980000000000
+
+Gdt64Len: equ $-Gdt64
+
+Gdt64Ptr: dw Gdt64Len-1
+          dd Gdt64

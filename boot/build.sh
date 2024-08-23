@@ -27,6 +27,13 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "Assembling kernel.asm..."
+nasm -f bin -o kernel.bin kernel.asm
+if [ $? -ne 0 ]; then
+  echo "Assembly of kernel.asm failed."
+  exit 1
+fi
+
 # Verify that boot.bin and loader.bin were created
 if [ ! -f boot.bin ]; then
   echo "'boot.bin' not found after assembly."
@@ -35,6 +42,11 @@ fi
 
 if [ ! -f loader.bin ]; then
   echo "'loader.bin' not found after assembly."
+  exit 1
+fi
+
+if [! -f kernel.bin]; then
+  echo "'kernel.bin' not found after assembly."
   exit 1
 fi
 
@@ -54,14 +66,14 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Write boot.bin to the image
+# Write boot.bin to the boot image
 dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
 if [ $? -ne 0 ]; then
   echo "Failed to write boot.bin to boot.img."
   exit 1
 fi
 
-# Write loader.bin to the image
+# Write loader.bin to the boot image
 dd if=loader.bin of=boot.img bs=512 count=1 seek=1 conv=notrunc
 if [ $? -ne 0 ]; then
   echo "Failed to write loader.bin to boot.img."
@@ -69,3 +81,10 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Bootable image created successfully: boot.img"
+
+# Write kernel.bin to the boot image
+dd if=kernel.bin of=boot.img bs=512 count=100 seek=6 conv=notrunc
+if [ $? -ne 0 ]; then
+  echo "Failed to write kernel.bin to boot.img."
+  exit 1
+fi
