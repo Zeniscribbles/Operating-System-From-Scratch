@@ -34,7 +34,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Verify that boot.bin and loader.bin were created
+# Verify that boot.bin, loader.bin and kernel.bin were created
 if [ ! -f boot.bin ]; then
   echo "'boot.bin' not found after assembly."
   exit 1
