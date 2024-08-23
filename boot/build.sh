@@ -45,7 +45,7 @@ if [ ! -f loader.bin ]; then
   exit 1
 fi
 
-if [! -f kernel.bin]; then
+if [ ! -f kernel.bin ]; then
   echo "'kernel.bin' not found after assembly."
   exit 1
 fi

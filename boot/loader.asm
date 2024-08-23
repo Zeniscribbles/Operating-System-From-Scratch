@@ -131,32 +131,31 @@ PmEntry:
 ;                                instead. Free memory for converting virtual address to 
 ;                                physical address.
     cld
-    mov edi, 0x70000
-    xor eax, eax
-    mov ecx, 0x10000/4
+    mov edi,0x70000
+    xor eax,eax
+    mov ecx,0x10000/4
     rep stosd
-
-    mov dword[0x70000], 0x71007
-    mov dword[0x71000], 10000111b
+    
+    mov dword[0x70000],0x71007
+    mov dword[0x71000],10000111b
 
     lgdt [Gdt64Ptr]
 
-    mov eax, cr4
-    or  eax, (1<<5)
-    mov cr4, eax
+    mov eax,cr4
+    or eax,(1<<5)
+    mov cr4,eax
 
-    mov eax, 0x70000
-    mov cr3, eax
+    mov eax,0x70000
+    mov cr3,eax
 
-    mov ecx, 0xc0000080
+    mov ecx,0xc0000080
     rdmsr
-    or eax, (1<<8)
+    or eax,(1<<8)
     wrmsr
 
-    ;Enable paging
-    mov eax, cr0
-    or  eax, (1<<31)
-    mov cr0, eax
+    mov eax,cr0
+    or eax,(1<<31)
+    mov cr0,eax
 
     jmp 8:LMEntry
 
@@ -171,9 +170,9 @@ LMEntry:
 
     cld                 ;Clear direction flag, processing data from low to high memory addresses. Forward direction.
     mov rdi, 0x200000   ;Destination address
-    mov rsi, 0x100000   ;Source addresss
+    mov rsi, 0x10000    ;Source addresss
     mov rcx, 51200/8    ;RCX acts as a counter, move instruction will execute multiple times
-    repeat movsq        ;Repeating previous instruction
+    rep movsq        ;Repeating previous instruction
     
     jmp 0x200000        ;Execution transferred to the kernel.
 
