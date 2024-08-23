@@ -74,7 +74,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Write loader.bin to the boot image
-dd if=loader.bin of=boot.img bs=512 count=1 seek=1 conv=notrunc
+dd if=loader.bin of=boot.img bs=512 count=5 seek=1 conv=notrunc
 if [ $? -ne 0 ]; then
   echo "Failed to write loader.bin to boot.img."
   exit 1
