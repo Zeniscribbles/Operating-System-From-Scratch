@@ -170,17 +170,13 @@ PEnd:
 LMEntry:
     mov rsp, 0x7c00
 
-    mov byte[0xb8000], 'L'
-    mov byte[0xb8001], 0xa
-
-
-    ;cld                 ;Clear direction flag, processing data from low to high memory addresses.
-    ;mov rdi, 0x200000   ;Destination address
-    ;mov rsi, 0x100000   ;Source addresss
-    ;mov rcx, 51200/8    ;RCX acts as a counter, move instruction will execute multiple times
-    ;repeat movsq
-    ;jmp 0x200000        ;Execution transferred to the kernel.
-
+    cld                 ;Clear direction flag, processing data from low to high memory addresses. Forward direction.
+    mov rdi, 0x200000   ;Destination address
+    mov rsi, 0x100000   ;Source addresss
+    mov rcx, 51200/8    ;RCX acts as a counter, move instruction will execute multiple times
+    repeat movsq        ;Repeating previous instruction
+    
+    jmp 0x200000        ;Execution transferred to the kernel.
 
 LEnd:
     hlt                     ;Halt the CPU after setting up protected mode. 
