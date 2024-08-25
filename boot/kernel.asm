@@ -11,6 +11,8 @@
 
 ;Kernel Start - Entry Point
 start:
+
+    ;Setup IDT entries
     mov rdi, Idt               ;Load the address of the Interrupt Descriptor Table (IDT) into RDI.
     mov rax, Handler0          ;Load the address of the interrupt handler (Handler0) into RAX.
 
@@ -20,7 +22,16 @@ start:
     shr rax, 16                ;Shift the handler address right by another 16 bits to access the high 32 bits.
     mov [rdi+8], eax           ;Store the high 32 bits of the handler address into the IDT entry at offset +8.
 
+ 
+    mov rax, Timer
+    add rdi, 32*16             ;Timer Entry
+    mov [rdi], ax              ;Store the lower 16 bits of the handler address into the IDT entry.
+    shr rax, 16                ;Shift the handler address right by 16 bits to access the next 16 bits.
+    mov [rdi+6], ax            ;Store these next 16 bits into the IDT entry at offset +6.
+    shr rax, 16                ;Shift the handler address right by another 16 bits to access the high 32 bits.
+    mov [rdi+8], eax  
 
+    ;Load GDT and IDT
     lgdt [Gdt64Ptr]            ;Load the 64-bit Global Descriptor Table (GDT).
                                ;This sets up the segment registers for 64-bit mode.
     
@@ -51,27 +62,148 @@ KernelEntry:
     mov byte[0xb8001],0xa      ;Move the color attribute (light green on black) into the second byte.
                                ;This sets the color for the character 'K'.
 
-    ;Deliberate Division by Zero (for exception testing):
-    xor rbx, rbx               ;Clear the RBX register (set to 0).
-    div rbx                    ;Attempt to divide by zero using RBX as the divisor.
-                               ;This will trigger a Division by Zero exception.
+
+;Initialize the Programmable Interval Timer (PIT)
+InitPIT:
+    mov al, (1<<2)|(3<<4)
+    out 0x43, al            ;Write value in al to th register [mode command: 0x43]
+
+    mov ax, 11931           ;Set the PIT to generate an interrupt every 1000ms (1s)
+    out 0x40, al            ;Write the low byte of the value in ax to the PIT counter low register [0x40]
+    mov al, ah              ;Move the high byte of the value in ax to al
+    out 0x40, al            ;Write the high byte of the value in ax to the PIT counter high register [0x40]
+
+
+ ;Initialize the Programmable Interrupt Controller (PIC)
+InitPIC:                     
+    mov al, 0x11              ;Initialize command for PIC.
+    out 0x20, al              ;PIC master command register.
+    out 0xa0, al              ;PIC slave command register.
+
+    mov al, 32                ;Set PIC master vector offset.
+    out 0x21, al              ;PIC master data register.
+    mov al, 40                ;Set PIC slave vector offset.
+    out 0xa1, al              ;PIC slave data register.
+
+    mov al, 4                 ;Configure PIC cascade.
+    out 0x21, al              ;PIC master data register.
+    mov al, 2                 ;Configure PIC cascade.
+    out 0xa1, al              ;PIC slave data register.
+
+    mov al, 1                 ;Set PIC mode (0 = 8086, 1 = 80x86).
+    out 0x21, al              ;PIC master data register.
+    out 0xa1, al              ;PIC slave data register.
+
+    mov al, 11111110b         ;Unmask all IRQs except IRQ2.
+    out 0x21, al              ;PIC master data register.
+    mov al, 11111111b         ;Unmask all IRQs on the slave PIC.
+    out 0xa1, al              ;PIC slave data register
+
+    sti     ;Enable interrupts
+
 ;Infinite Loop - Kernel Halt
 End:
     hlt         ;Halt the CPU.
     jmp End     ;Infinite loop to prevent execution past the end.
                 ;Keeps the kernel running in a stable state.
 
+
 Handler0:
+
+    ;Saving the state of all general-purpose registers at the start of the interrupt handler,
+    ;performs a task (in this case, displaying a character on the screen), and then restoring
+    ;the original register values before returning from the interrupt. 
+
+    ;Save the state of all general-purpose registers to preserve their values
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+
     ;Display the letter 'D' on the screen
     mov byte[0xb8000],'D'      ;Move the ASCII value for 'D' into the first byte of video memory.
                                ;0xb8000 is the start address of the text mode video memory.
 
-    mov byte[0xb8001],0xc      ;Move the color attribute (red on black) into the second byte.
+    mov byte[0xb8001], 0xc     ;Move the color attribute (red on black) into the second byte.
                                ;This sets the color for the character 'D'.
     
-    jmp End
-    iretq ;Interrupt return, handler done.
+   
+    jmp End      ;Skip the register restoration and jump to the end of the handler
+
+    ;Restore the state of all general-purpose registers
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+
+    iretq  ;Return from the interrupt handler and resume normal execution
      
+
+Timer: 
+
+    ;Save the state of all general-purpose registers to preserve their values
+    push rax
+    push rbx  
+    push rcx
+    push rdx  	  
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+    
+    ;Display the letter 'T' in a different location than 'K'
+    mov byte[0xb8020], 'T'  ;Move 'T' into a different location in video memory.
+    mov byte[0xb8021], 0xe  ;Color attribute (yellow on black).
+
+    jmp End      ;Skip the register restoration and jump to the end of the handler
+
+    ;Restore the state of all general-purpose registers
+    pop	r15
+    pop	r14
+    pop	r13
+    pop	r12
+    pop	r11
+    pop	r10
+    pop	r9
+    pop	r8
+    pop	rbp
+    pop	rdi
+    pop	rsi  
+    pop	rdx
+    pop	rcx
+    pop	rbx
+    pop	rax
+
+    iretq   ;Return from the interrupt handler and resume normal execution
 
 ;64-bit Global Descriptor Table (GDT) Definition
 Gdt64:  
