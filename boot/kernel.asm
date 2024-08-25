@@ -100,13 +100,25 @@ InitPIC:
     out 0xa1, al              ;PIC slave data register
 
     ;sti     ;Enable interrupts
+   
+    ;Prepare for switching to 64-bit mode and call the UserEntry function.
+    push 0x18|3         ;Push the code segment selector (CS) with the 64-bit segment (0x18) and privilege level (3).
+                        ;This selector is used to access the code segment in 64-bit mode with user privileges.
 
-    push 0x18|3
-    push 0x7c00
-    push 0x2
-    push 0x10|3
-    push UserEntry
-    iretq
+    push 0x7c00         ;Push the address (0x7c00) where execution will continue after switching to 64-bit mode.
+                        ;This address should be where the kernel's 64-bit entry point is located.
+
+    push 0x2            ;Push the value 0x2 onto the stack.
+                        
+
+    push 0x10|3         ;Push the stack segment selector (SS) with the 64-bit stack segment (0x10) and privilege level (3).
+                        ;This selector is used for the stack segment in 64-bit mode with user privileges.
+
+    push UserEntry      ;Push the address of the UserEntry label onto the stack.
+                        ;This is the entry point where execution will continue after switching to 64-bit mode.
+
+    iretq               ;The IRETQ instruction will pop the values off the stack (CS, RIP, and flags) and
+                        ;resume execution at the address specified, transitioning to 64-bit mode.
 
 ;Infinite Loop - Kernel Halt
 End:
