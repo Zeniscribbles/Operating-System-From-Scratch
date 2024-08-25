@@ -148,29 +148,13 @@ End:
 
 
 UserEntry:
-    ;Check the current privilege level by examining the value in the CS (Code Segment) register.
-    mov ax, cs              ;Move the value of the CS (Code Segment) register into AX.
-                            ;This contains the segment selector and privilege level bits.
+    ;Testing control is transferred between user entry and time handler:
+    inc byte[0xb8010]       ;Increment the character to signify test passed.
 
-    and al, 11b             ;Mask out all but the lower 2 bits of AL.
-                            ;The lower 2 bits of the CS register indicate the current privilege level (CPL).
-                            ;Ring 3 (user mode) has a privilege level of 3 (binary 11).
-
-    cmp al, 3               ;Compare the result in AL with 3.
-                            ;This checks if the current privilege level is Ring 3 (user mode).
-
-    jne UEnd                ;If the current privilege level is not Ring 3 (CPL != 3), jump to UEnd.
-                            ;This effectively means if we are not in user mode, skip the following code.
-
-    ;Display 'U' on the screen if the privilege level is Ring 3.
-    mov byte[0xb8010], 'U'  ;Move the ASCII value for 'U' into the first byte of video memory at address 0xb8010.
-                            ;This sets the character 'U' to be displayed on the screen.
-
-    mov byte[0xb8011], 0xE  ;Move the color attribute (light purple on black) into the second byte of video memory at address 0xb8011.
-                            ;This sets the color for the character 'U'.
+    mov byte[0xb8011], 0xF  ;Move the color attribute (white).
 
 UEnd:
-    jmp UEnd                ;Jump to UEnd and loop indefinitely.
+    jmp UserEntry           ;Jump to beginning of UserEntry to loop through the code.
                             ;This halts further execution and keeps the CPU in a stable state.
                             
 
@@ -246,11 +230,13 @@ Timer:
     push r14
     push r15
     
-    ;Display the letter 'T' in a different location than 'K'
-    mov byte[0xb8020], 'T'  ;Move 'T' into a different location in video memory.
+    ;Display a changing character in a different location than 'K'
+    inc byte[0xb8020]       ;Increment character to signify multiple interrupt.
     mov byte[0xb8021], 0xe  ;Color attribute (yellow on black).
 
-    jmp End      ;Skip the register restoration and jump to the end of the handler
+    ;Acknowledging the interrupts
+    mov al, 0x20
+    out 0x20, al           ;Write to comman register of the master
 
     ;Restore the state of all general-purpose registers
     pop	r15
