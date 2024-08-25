@@ -29,7 +29,7 @@ start:
     shr rax, 16                ;Shift the handler address right by 16 bits to access the next 16 bits.
     mov [rdi+6], ax            ;Store these next 16 bits into the IDT entry at offset +6.
     shr rax, 16                ;Shift the handler address right by another 16 bits to access the high 32 bits.
-    mov [rdi+8], eax  
+    mov [rdi+8], eax           ;Store the high 32 bits of the handler address into the IDT entry at offset +8.
 
     ;Load GDT and IDT
     lgdt [Gdt64Ptr]            ;Load the 64-bit Global Descriptor Table (GDT).
@@ -37,6 +37,26 @@ start:
     
     lidt [IdtPtr]              ;Load the Interrupt Descriptor Table (IDT) pointer.
                                ;This sets up the interrupt vector table for handling CPU exceptions and interrupts.
+
+;Setting the Task State Segment (TSS):
+SetTss:
+    mov rax, Tss               ;Load the base address of the Task State Segment (TSS) into RAX register.
+                               ;This address will be used to set up the TSS descriptor.
+
+    ;Update the TSS Descriptor with the base address of the TSS.
+    mov [TssDesc + 2], ax      ;Store the lower 16 bits of the TSS base address into TssDesc+2.
+    shr rax, 16                ;Shift the base address right by 16 bits to access the next 16 bits.
+    mov [TssDesc + 4], al      ;Store these next 16 bits into TssDesc+4.
+    shr rax, 8                 ;Shift the base address right by 8 bits to access the next 8 bits.
+    mov [TssDesc + 7], al      ;Store these next 8 bits into TssDesc+7.
+    shr rax, 8                 ;Shift the base address right by 8 bits to access the final 8 bits.
+    mov [TssDesc + 8], eax     ;Store the remaining 32 bits of the base address into TssDesc+8.
+
+    mov ax, 0x20            ;Load the TSS selector (0x20) into AX register.
+                            ;This selector points to the TSS descriptor in the GDT.
+
+    ltr ax                  ;Load the Task Register (TR) with the TSS selector.
+                            ;This sets up the task state segment for task switching and other task-related operations.
 
 
     ;Transition to 64-bit Mode
@@ -108,7 +128,7 @@ InitPIC:
     push 0x7c00         ;Push the address (0x7c00) where execution will continue after switching to 64-bit mode.
                         ;This address should be where the kernel's 64-bit entry point is located.
 
-    push 0x2            ;Push the value 0x2 onto the stack.
+    push 0x202          ;Push the value 0x202 onto the stack. Interrupt is enabled.
                         
 
     push 0x10|3         ;Push the stack segment selector (SS) with the 64-bit stack segment (0x10) and privilege level (3).
@@ -262,10 +282,36 @@ Gdt64:
                                ;- DPL = 0 (Privilege level)
                                ;- Present = 1
                                ;- Granularity = 1 (4KB blocks)
-    dq 0x0020f80000000000 
-    dq 0x0000f20000000000 
+    
+    dq 0x0020f80000000000      ;64-bit data segment descriptor: Data Segment
+                            
+    dq 0x0000f20000000000      ;Another data segment descriptor:
 
-; GDT Size and Pointer Setup              
+TssDesc:
+    dw TssLen-1                ;Limit of the TSS segment (size of the TSS structure minus one byte).
+                               
+    dw 0                       ;Base Address (low 16 bits):
+                               ;The lower part of the base address of the TSS segment. This will be combined
+                               ;with the other base address fields to form the full 64-bit base address.
+
+    db 0                       ;Base Address (middle 8 bits):
+                               ;The middle part of the base address of the TSS segment.
+
+    db 0x89                    ;Type and attribute field:
+                               ;- Type = 0x9 (Available 64-bit TSS)
+                               ;- DPL = 0 (Privilege level 0, meaning only kernel code can access this TSS)
+                               ;- Present bit = 1 (Indicates that the TSS is present in memory)
+
+    db 0                       ;Base Address (high 8 bits):
+                               ;The higher part of the base address of the TSS segment.
+
+    db 0                       ;Reserved, typically set to 0.
+    
+    dq 0                       ;Base Address (upper 32 bits):
+                               ;The upper 32 bits of the base address, which are only relevant in 64-bit mode.
+                               ;Since this code likely doesn't use addresses beyond 4GB, it's set to 0.
+
+;GDT Size and Pointer Setup              
 Gdt64Len: equ $-Gdt64          ; Calculate the size of the GDT by subtracting the start address from the current address.
 
 Gdt64Ptr: 
@@ -288,11 +334,31 @@ Idt:
     %endrep
 
 ; Define the length of the IDT:
-; IdtLen represents the size of the IDT in bytes, calculated as the current address minus the start of the IDT.
+;IdtLen represents the size of the IDT in bytes, calculated as the current address minus the start of the IDT.
 IdtLen: equ $-Idt
 
-; Define the IDT pointer structure:
-; IdtPtr contains the size of the IDT (IdtLen-1) and the base address of the IDT (Idt).
+;Define the IDT pointer structure:
+;IdtPtr contains the size of the IDT (IdtLen-1) and the base address of the IDT (Idt).
 IdtPtr: dw IdtLen-1   ; Limit field: Length of the IDT in bytes minus one.
         dq Idt        ; Base field: Address of the IDT.
+
+
+;Defining the Task State Segment (TSS) descriptor:
+Tss:
+     dd 0                    ;Reserved field, often set to 0. It’s unused and helps align the TSS structure.
+    
+    dq 0x150000              ;The RSP0 (Stack Pointer for Ring 0) field. This specifies the stack pointer used when
+                             ;the CPU transitions from a less privileged level (e.g., user mode) to Ring 0 (kernel mode).
+                             ;0x150000 is the address of the stack to be used in kernel mode.
+
+    times 88 db 0            ;Reserved space, setting 88 bytes to 0. This reserves space for other TSS fields that are
+                             ;either unused or will be set later. 
+
+    dd TssLen                ;The IO Map Base Address field. This field contains the offset in the TSS at which the 
+                             ;I/O permission bit map starts. By setting it to TssLen, the I/O map begins after the end
+                             ;of the TSS, effectively disabling it.
+
+TssLen: equ $-Tss           ;Calculate the length of the TSS by subtracting the address of the TSS from the current 
+                            ;address (`$`). This gives the size of the TSS structure, which is used in the GDT.
+
 
