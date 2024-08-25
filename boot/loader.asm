@@ -126,42 +126,52 @@ PmEntry:
                             ;This is typically where the bootloader was loaded, and setting the stack here is convenient 
                             ;for continuing operations in protected mode.
 
-;Setting up and enabling paging: The addresses [0x80000 - 0x90000] may be used for
-;                                BIOS data. We can use memory area from 0x70000 to 0x80000
-;                                instead. Free memory for converting virtual address to 
-;                                physical address.
-    cld
-    mov edi,0x70000
-    xor eax,eax
-    mov ecx,0x10000/4
-    rep stosd
+;Setting up and enabling paging: Memory area [0x80000 - 0x90000] may be used by BIOS. Therefore, we use memory 
+;                                from 0x70000 to 0x80000 to create page tables for converting virtual addresses 
+;                                to physical addresses.
+
+    cld                         ;Clear the direction flag to ensure string operations increment the pointer
+    mov edi,0x70000             ;Set destination index (EDI) to 0x70000, where page tables will be stored
+    xor eax,eax                 ;Clear EAX to use it for filling the memory with zeros (null page entries)
+    mov ecx,0x10000/4           ;Set loop counter (ECX) to the number of dwords to clear (0x10000 bytes / 4 bytes per dword)
+    rep stosd                   ;Fill the memory area from 0x70000 to 0x80000 with zeros (clear the page tables)
     
-    mov dword[0x70000],0x71007
-    mov dword[0x71000],10000111b
 
-    lgdt [Gdt64Ptr]
+    ;Set up the page directory entry and the first page table entry
+    mov dword[0x70000],0x71007     ;Set the first page directory entry to point to the page table at 0x71000
+                                   ;The entry marks the page as present, writable, and 4KB aligned
+    mov dword[0x71000],10000111b   ;Set the first page table entry to map the first 4KB of physical memory 
+                                   ;The entry marks the page as present, writable, and accessible from all privilege levels
 
-    mov eax,cr4
-    or eax,(1<<5)
-    mov cr4,eax
+    ;Load the Global Descriptor Table (GDT)
+    lgdt [Gdt64Ptr]   ;Load the GDT using the pointer structure defined earlier
 
-    mov eax,0x70000
-    mov cr3,eax
+    ;Enable PAE (Physical Address Extension)
+    mov eax,cr4                 ;Load CR4 register into EAX
+    or eax,(1<<5)               ;Set the PAE bit (bit 5) in EAX
+    mov cr4,eax                 ;Store the updated value back to CR4
 
-    mov ecx,0xc0000080
-    rdmsr
-    or eax,(1<<8)
-    wrmsr
+    ;Set the Page Directory Base Register (PDBR)
+    mov eax,0x70000             ;Load the base address of the page directory into EAX
+    mov cr3,eax                 ;Store the base address in CR3 (PDBR), enabling paging
 
-    mov eax,cr0
-    or eax,(1<<31)
-    mov cr0,eax
+    ;Enable Long Mode (64-bit mode)
+    mov ecx,0xc0000080          ;Load the address of the Extended Feature Enable Register (EFER) into ECX
+    rdmsr                       ;Read the EFER into EDX:EAX
+    or eax,(1<<8)               ;Set the Long Mode Enable (LME) bit (bit 8) in EAX
+    wrmsr                       ;Write the updated value back to EFER
 
-    jmp 8:LMEntry
+    ;Enable Paging and Protection in CR0
+    mov eax,cr0                 ;Load CR0 register into EAX
+    or eax,(1<<31)              ;Set the PG bit (bit 31) in EAX to enable paging
+    mov cr0,eax                 ;Store the updated value back to CR0
+
+    ;Jump to 64-bit Long Mode Entry Point
+    jmp 8:LMEntry   ;Far jump to the Long Mode entry point (LMEntry) in the 64-bit code segment
 
 PEnd: 
-    hlt                     ;Halt the CPU after setting up protected mode. 
-    jmp End                 ;Enter an infinite loop, ensuring the CPU remains halted and does not execute any unintended instructions.
+    hlt                 ;Halt the CPU after setting up protected mode. 
+    jmp End             ;Enter an infinite loop, ensuring the CPU remains halted and does not execute any unintended instructions.
 
 
 [BITS 64]       ;Indicate that the following code is in 64-bit mode [jumping to the kernel].
@@ -172,7 +182,7 @@ LMEntry:
     mov rdi, 0x200000   ;Destination address
     mov rsi, 0x10000    ;Source addresss
     mov rcx, 51200/8    ;RCX acts as a counter, move instruction will execute multiple times
-    rep movsq        ;Repeating previous instruction
+    rep movsq           ;Repeating previous instruction
     
     jmp 0x200000        ;Execution transferred to the kernel.
 
@@ -182,8 +192,8 @@ LEnd:
 
 
 
-DriveID:    db 0                        ;Variable to store the drive ID.
-ReadPacket: times 16 db 0               ;Define 16 bytes, each initialized to 0.
+DriveID:    db 0            ;Variable to store the drive ID.
+ReadPacket: times 16 db 0   ;Define 16 bytes, each initialized to 0.
 
 ;Data structure for the extended read function. 
 ;Disk Address Packet [DAP] Structure:
@@ -240,11 +250,15 @@ Idt32Ptr: dw 0  ;Set to zero to avoid interrupts before entering long mode
                 ;need to boot our system if errors occur.
 
 
-Gdt64:  
-    dq 0
-    dq 0x0020980000000000
+;Define the 64-bit Global Descriptor Table (GDT)
+Gdt64:
+    dq 0                    ;Null descriptor: Required by the CPU, must be present as the first entry in the GDT
+    dq 0x0020980000000000   ;Code segment descriptor: Defines a 64-bit code segment, base=0, limit=4GB, and other attributes
 
+;Calculate the size of the GDT (in bytes) by subtracting the start address from the current address
 Gdt64Len: equ $-Gdt64
 
-Gdt64Ptr: dw Gdt64Len-1
-          dd Gdt64
+;Create a pointer structure that stores the size of the GDT and the address of the GDT itself
+Gdt64Ptr:
+    dw Gdt64Len-1           ;Limit (size) of the GDT: This is the length of GDT in bytes minus 1
+    dd Gdt64                ;Base address of the GDT: This is the memory address where the GDT begins
