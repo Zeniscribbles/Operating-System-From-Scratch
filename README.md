@@ -113,5 +113,108 @@ Student Project: Writing a 64-bit operating system - for the x86 architecture fr
 | **EFER** | 64-bit | Extended Feature Enable Register: Used to enable long mode and other CPU features. | 64-bit |
 
 
+## IDT (Interrupt Descriptor Table)
+
+| **Field**          | **Description**                                                |
+|--------------------|----------------------------------------------------------------|
+| **Base Address**   | Address where the IDT starts in memory.                        |
+| **Limit**          | Size of the IDT, typically set with the `lidt` instruction.      |
+| **Entry Size**     | Each IDT entry is 8 bytes (16 bytes in some modes).              |
+| **Entry Structure**| Each entry typically includes the offset, segment selector, and type. |
+
+### IDT Entry Structure:
+
+| **Field**          | **Description**                                                |
+|--------------------|----------------------------------------------------------------|
+| **Offset (15:0)**  | Lower 16 bits of the interrupt handler's address.               |
+| **Selector**       | Segment selector for the segment where the handler resides.     |
+| **Type (4 bits)**  | Type of the gate (Interrupt, Trap, Task, etc.).                 |
+| **DPL (2 bits)**   | Descriptor Privilege Level, defines the privilege level needed to access the gate. |
+| **Present (1 bit)**| Indicates if the descriptor is present.                         |
+| **Offset (31:16)** | Upper 16 bits of the interrupt handler's address.               |
+
+## GDT (Global Descriptor Table)
+
+| **Field**          | **Description**                                                |
+|--------------------|----------------------------------------------------------------|
+| **Base Address**   | Address where the GDT starts in memory.                        |
+| **Limit**          | Size of the GDT, set with the `lgdt` instruction.               |
+| **Entry Size**     | Each GDT entry is 8 bytes.                                      |
+| **Entry Structure**| Each entry defines a segment's base address, limit, and attributes. |
+
+### GDT Entry Structure:
+
+| **Field**          | **Description**                                                |
+|--------------------|----------------------------------------------------------------|
+| **Base (15:0)**    | Lower 16 bits of the base address.                              |
+| **Selector**       | Segment selector for this descriptor.                           |
+| **Type (4 bits)**  | Type of segment (Code, Data, etc.).                             |
+| **S (1 bit)**       | Descriptor type (0 = System, 1 = Code/Data).                    |
+| **DPL (2 bits)**   | Descriptor Privilege Level, defines access rights.             |
+| **Present (1 bit)**| Indicates if the descriptor is present.                         |
+| **Base (23:16)**   | Middle 8 bits of the base address.                              |
+| **Limit (15:0)**   | Limit of the segment, specifying its size.                      |
+| **Base (31:24)**   | Upper 8 bits of the base address.                               |
+| **Type (4 bits)**  | Segment type (Code, Data, etc.).                                |
+| **Granularity (1 bit)** | Determines the unit of segment limit (byte or page).       |
+
+## Interrupts and Exceptions
+
+| **Type**            | **Description**                                                |
+|---------------------|----------------------------------------------------------------|
+| **Interrupts**      | Events that trigger an interrupt request to the CPU.            |
+| **Exceptions**      | Errors or exceptional conditions that trigger an interrupt.     |
+
+### Common Interrupts and Exceptions:
+
+| **Type**            | **Number** | **Description**                            |
+|---------------------|------------|--------------------------------------------|
+| **Divide Error**    | 0          | Division by zero error.                    |
+| **Debug Exception** | 1          | Debug exception for debugging purposes.    |
+| **NMI**             | 2          | Non-maskable interrupt.                    |
+| **Breakpoint**      | 3          | Breakpoint exception for debugging.        |
+| **Overflow**        | 4          | Overflow exception for arithmetic overflow.|
+| **Bound Range Exceeded** | 5      | Exception for exceeding bounds.            |
+| **Invalid Opcode**  | 6          | Invalid opcode exception.                  |
+| **Device Not Available** | 7     | CPU device not available exception.        |
+| **Double Fault**    | 8          | Double fault exception.                    |
+| **Coprocessor Segment Overrun** | 9  | Coprocessor segment overrun exception.     |
+| **Invalid TSS**     | 10         | Invalid task state segment exception.      |
+| **Segment Not Present** | 11      | Segment not present exception.             |
+| **Stack Fault**     | 12         | Stack fault exception.                     |
+| **General Protection Fault** | 13 | General protection fault exception.        |
+| **Page Fault**      | 14         | Page fault exception.                      |
+| **Reserved**        | 15         | Reserved for future use.                   |
+| **x87 FPU Floating-Point Error** | 16 | Floating-point unit exception.           |
+| **Alignment Check** | 17         | Alignment check exception.                 |
+| **Machine Check**   | 18         | Machine check exception.                  |
+| **SIMD Floating-Point Exception** | 19 | SIMD floating-point exception.            |
+| **Virtualization Exception** | 20  | Virtualization exception.                  |
+
+## Interrupt Controller
+
+**8259A Programmable Interrupt Controller (PIC):**
+
+| **Register**       | **Description**                                             |
+|--------------------|-------------------------------------------------------------|
+| **ICW1**           | Initialization Command Word 1 (control word for initialization). |
+| **ICW2**           | Initialization Command Word 2 (defines the interrupt vector offset). |
+| **ICW3**           | Initialization Command Word 3 (defines the cascade configuration). |
+| **ICW4**           | Initialization Command Word 4 (defines mode of operation). |
+| **OCW1**           | Operation Command Word 1 (mask register for interrupt enable/disable). |
+| **OCW2**           | Operation Command Word 2 (defines interrupt handling behavior). |
+| **OCW3**           | Operation Command Word 3 (provides additional control functions). |
+
+### ICW and OCW Overview:
+
+| **ICW/OCW** | **Purpose**                                          |
+|-------------|------------------------------------------------------|
+| **ICW1**    | Initialize PICs, specify mode, and define cascade.  |
+| **ICW2**    | Set interrupt vector offset.                        |
+| **ICW3**    | Set cascade configuration.                          |
+| **ICW4**    | Set operational mode (8086/8088, auto EOI, etc.).   |
+| **OCW1**    | Mask interrupts, enable/disable individual IRQs.    |
+| **OCW2**    | End of interrupt (EOI) control, set priority.        |
+| **OCW3**    | Read IRQ status, additional control.                |
 
 
