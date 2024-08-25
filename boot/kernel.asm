@@ -51,10 +51,10 @@ KernelEntry:
     mov byte[0xb8001],0xa      ;Move the color attribute (light green on black) into the second byte.
                                ;This sets the color for the character 'K'.
 
-    ;Division by zero handling:
-    xor rbx, rbx
-    div rbx
-
+    ;Deliberate Division by Zero (for exception testing):
+    xor rbx, rbx               ;Clear the RBX register (set to 0).
+    div rbx                    ;Attempt to divide by zero using RBX as the divisor.
+                               ;This will trigger a Division by Zero exception.
 ;Infinite Loop - Kernel Halt
 End:
     hlt         ;Halt the CPU.
