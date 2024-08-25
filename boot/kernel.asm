@@ -99,7 +99,14 @@ InitPIC:
     mov al, 11111111b         ;Unmask all IRQs on the slave PIC.
     out 0xa1, al              ;PIC slave data register
 
-    sti     ;Enable interrupts
+    ;sti     ;Enable interrupts
+
+    push 0x18|3
+    push 0x7c00
+    push 0x2
+    push 0x10|3
+    push UserEntry
+    iretq
 
 ;Infinite Loop - Kernel Halt
 End:
@@ -107,6 +114,33 @@ End:
     jmp End     ;Infinite loop to prevent execution past the end.
                 ;Keeps the kernel running in a stable state.
 
+
+UserEntry:
+    ;Check the current privilege level by examining the value in the CS (Code Segment) register.
+    mov ax, cs              ;Move the value of the CS (Code Segment) register into AX.
+                            ;This contains the segment selector and privilege level bits.
+
+    and al, 11b             ;Mask out all but the lower 2 bits of AL.
+                            ;The lower 2 bits of the CS register indicate the current privilege level (CPL).
+                            ;Ring 3 (user mode) has a privilege level of 3 (binary 11).
+
+    cmp al, 3               ;Compare the result in AL with 3.
+                            ;This checks if the current privilege level is Ring 3 (user mode).
+
+    jne UEnd                ;If the current privilege level is not Ring 3 (CPL != 3), jump to UEnd.
+                            ;This effectively means if we are not in user mode, skip the following code.
+
+    ;Display 'U' on the screen if the privilege level is Ring 3.
+    mov byte[0xb8010], 'U'  ;Move the ASCII value for 'U' into the first byte of video memory at address 0xb8010.
+                            ;This sets the character 'U' to be displayed on the screen.
+
+    mov byte[0xb8011], 0xE  ;Move the color attribute (light purple on black) into the second byte of video memory at address 0xb8011.
+                            ;This sets the color for the character 'U'.
+
+UEnd:
+    jmp UEnd                ;Jump to UEnd and loop indefinitely.
+                            ;This halts further execution and keeps the CPU in a stable state.
+                            
 
 Handler0:
 
@@ -216,6 +250,8 @@ Gdt64:
                                ;- DPL = 0 (Privilege level)
                                ;- Present = 1
                                ;- Granularity = 1 (4KB blocks)
+    dq 0x0020f80000000000 
+    dq 0x0000f20000000000 
 
 ; GDT Size and Pointer Setup              
 Gdt64Len: equ $-Gdt64          ; Calculate the size of the GDT by subtracting the start address from the current address.
@@ -247,3 +283,4 @@ IdtLen: equ $-Idt
 ; IdtPtr contains the size of the IDT (IdtLen-1) and the base address of the IDT (Idt).
 IdtPtr: dw IdtLen-1   ; Limit field: Length of the IDT in bytes minus one.
         dq Idt        ; Base field: Address of the IDT.
+
