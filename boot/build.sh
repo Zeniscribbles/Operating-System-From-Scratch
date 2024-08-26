@@ -1,18 +1,15 @@
 #!/bin/bash
 #End of Line Sequence: Set to CRLF
 
-# Ensure that boot.asm and loader.asm exist
-if [ ! -f boot.asm ]; then
-  echo "'boot.asm' not found in the current directory."
-  exit 1
-fi
+#Ensure that boot.asm, loader.asm, and kernel.asm exist
+for file in boot.asm loader.asm kernel.asm main.c linker.lds; do
+  if [ ! -f $file ]; then
+    echo "'$file' not found in the current directory."
+    exit 1
+  fi
+done
 
-if [ ! -f loader.asm ]; then
-  echo "'loader.asm' not found in the current directory."
-  exit 1
-fi
-
-# Assemble boot.asm and loader.asm
+#Assemble boot.asm 
 echo "Assembling boot.asm..."
 nasm -f bin -o boot.bin boot.asm
 if [ $? -ne 0 ]; then
@@ -20,6 +17,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+#Assemble loader.asm
 echo "Assembling loader.asm..."
 nasm -f bin -o loader.bin loader.asm
 if [ $? -ne 0 ]; then
@@ -27,14 +25,41 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+#Assemble kernel.asm
 echo "Assembling kernel.asm..."
-nasm -f bin -o kernel.bin kernel.asm
+nasm -f elf64 -o kernel.o kernel.asm
 if [ $? -ne 0 ]; then
   echo "Assembly of kernel.asm failed."
   exit 1
 fi
 
-# Verify that boot.bin, loader.bin and kernel.bin were created
+#Compile main.c
+echo "Assembling main.c..."
+gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c main.c
+if [ $? -ne 0 ]; then
+  echo "Compilation of main.c failed."
+  exit 1
+fi
+
+
+# Link kernel.o and main.o
+echo "Linking kernel.o and main.o..."
+ld -nostdlib -T linker.lds -o kernel kernel.o main.o
+if [ $? -ne 0 ]; then
+  echo "Linking failed."
+  exit 1
+fi
+
+# Convert the kernel to a binary format
+echo "Converting kernel to binary format..."
+objcopy -O binary kernel kernel.bin
+if [ $? -ne 0 ]; then
+  echo "Conversion to binary failed."
+  exit 1
+fi
+
+
+# Verify that boot.bin, loader.bin, kernel.o, and main.o were created
 if [ ! -f boot.bin ]; then
   echo "'boot.bin' not found after assembly."
   exit 1
@@ -45,18 +70,24 @@ if [ ! -f loader.bin ]; then
   exit 1
 fi
 
-if [ ! -f kernel.bin ]; then
-  echo "'kernel.bin' not found after assembly."
+if [ ! -f kernel.o ]; then
+  echo "'kernel.o' not found after assembly."
   exit 1
 fi
 
-# Remove any existing boot.img file
+if [ ! -f main.o ]; then
+  echo "'main.o' not found after assembly."
+  exit 1
+fi 
+
+
+#Remove any existing boot.img file
 if [ -f boot.img ]; then
   echo "Removing existing boot.img..."
   rm -f boot.img
 fi
 
-# Create a 10MB image file
+#Create a 10MB image file
 IMAGE_SIZE_MB=10
 IMAGE_SIZE_BYTES=$((IMAGE_SIZE_MB * 1024 * 1024))
 echo "Creating a ${IMAGE_SIZE_MB}MB bootable image..."
@@ -66,14 +97,14 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Write boot.bin to the boot image
+#Write boot.bin to the boot image
 dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
 if [ $? -ne 0 ]; then
   echo "Failed to write boot.bin to boot.img."
   exit 1
 fi
 
-# Write loader.bin to the boot image
+#Write loader.bin to the boot image
 dd if=loader.bin of=boot.img bs=512 count=5 seek=1 conv=notrunc
 if [ $? -ne 0 ]; then
   echo "Failed to write loader.bin to boot.img."
@@ -82,7 +113,7 @@ fi
 
 echo "Bootable image created successfully: boot.img"
 
-# Write kernel.bin to the boot image
+#Write kernel.bin to the boot image
 dd if=kernel.bin of=boot.img bs=512 count=100 seek=6 conv=notrunc
 if [ $? -ne 0 ]; then
   echo "Failed to write kernel.bin to boot.img."

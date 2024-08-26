@@ -1,261 +1,9 @@
 ;;; This is the Kernel...A wild byte has appeared
-
-[BITS 64]       ;Directive: Assembling the code for 64-bit mode.
-                ;           This directive tells the assembler that the code 
-                ;           should be generated for 64-bit execution.
-
-[ORG 0x200000]  ;Directive: The kernel's origin is set to 0x200000.
-                ;           This is the base address in memory where the kernel
-                ;           is loaded and executed.
+;;;
 
 
-;Kernel Start - Entry Point
-start:
-
-    ;Setup IDT entries
-    mov rdi, Idt               ;Load the address of the Interrupt Descriptor Table (IDT) into RDI.
-    mov rax, Handler0          ;Load the address of the interrupt handler (Handler0) into RAX.
-
-    mov [rdi], ax              ;Store the lower 16 bits of the handler address into the IDT entry.
-    shr rax, 16                ;Shift the handler address right by 16 bits to access the next 16 bits.
-    mov [rdi+6], ax            ;Store these next 16 bits into the IDT entry at offset +6.
-    shr rax, 16                ;Shift the handler address right by another 16 bits to access the high 32 bits.
-    mov [rdi+8], eax           ;Store the high 32 bits of the handler address into the IDT entry at offset +8.
-
- 
-    mov rax, Timer
-    add rdi, 32*16             ;Timer Entry
-    mov [rdi], ax              ;Store the lower 16 bits of the handler address into the IDT entry.
-    shr rax, 16                ;Shift the handler address right by 16 bits to access the next 16 bits.
-    mov [rdi+6], ax            ;Store these next 16 bits into the IDT entry at offset +6.
-    shr rax, 16                ;Shift the handler address right by another 16 bits to access the high 32 bits.
-    mov [rdi+8], eax           ;Store the high 32 bits of the handler address into the IDT entry at offset +8.
-
-    ;Load GDT and IDT
-    lgdt [Gdt64Ptr]            ;Load the 64-bit Global Descriptor Table (GDT).
-                               ;This sets up the segment registers for 64-bit mode.
-    
-    lidt [IdtPtr]              ;Load the Interrupt Descriptor Table (IDT) pointer.
-                               ;This sets up the interrupt vector table for handling CPU exceptions and interrupts.
-
-;Setting the Task State Segment (TSS):
-SetTss:
-    mov rax, Tss               ;Load the base address of the Task State Segment (TSS) into RAX register.
-                               ;This address will be used to set up the TSS descriptor.
-
-    ;Update the TSS Descriptor with the base address of the TSS.
-    mov [TssDesc + 2], ax      ;Store the lower 16 bits of the TSS base address into TssDesc+2.
-    shr rax, 16                ;Shift the base address right by 16 bits to access the next 16 bits.
-    mov [TssDesc + 4], al      ;Store these next 16 bits into TssDesc+4.
-    shr rax, 8                 ;Shift the base address right by 8 bits to access the next 8 bits.
-    mov [TssDesc + 7], al      ;Store these next 8 bits into TssDesc+7.
-    shr rax, 8                 ;Shift the base address right by 8 bits to access the final 8 bits.
-    mov [TssDesc + 8], eax     ;Store the remaining 32 bits of the base address into TssDesc+8.
-
-    mov ax, 0x20            ;Load the TSS selector (0x20) into AX register.
-                            ;This selector points to the TSS descriptor in the GDT.
-
-    ltr ax                  ;Load the Task Register (TR) with the TSS selector.
-                            ;This sets up the task state segment for task switching and other task-related operations.
-
-
-    ;Transition to 64-bit Mode
-    push 8                     ; Push the code segment selector (CS) for the 64-bit code segment onto the stack.
-                               ; Selector 8 corresponds to the segment defined in the GDT.
-
-    push KernelEntry           ; Push the address of the KernelEntry label onto the stack.
-                               ; This is where execution will continue after switching to 64-bit mode.
-
-    db 0x48                    ; Emit the REX.W prefix (0x48) for a 64-bit `retf` instruction.
-                               ; REX.W is needed for a far return (retf) that pops a 64-bit address.
-
-    retf                       ; Far return: This pops the segment selector (CS) and instruction pointer (RIP) 
-                               ; from the stack, effectively jumping to the KernelEntry in 64-bit mode.
-
-
-;Kernel Entry - 64-bit Mode
-KernelEntry:
-    ;Display the letter 'K' on the screen
-    mov byte[0xb8000],'K'      ;Move the ASCII value for 'K' into the first byte of video memory.
-                               ;0xb8000 is the start address of the text mode video memory.
-
-    mov byte[0xb8001],0xa      ;Move the color attribute (light green on black) into the second byte.
-                               ;This sets the color for the character 'K'.
-
-
-;Initialize the Programmable Interval Timer (PIT)
-InitPIT:
-    mov al, (1<<2)|(3<<4)
-    out 0x43, al            ;Write value in al to th register [mode command: 0x43]
-
-    mov ax, 11931           ;Set the PIT to generate an interrupt every 1000ms (1s)
-    out 0x40, al            ;Write the low byte of the value in ax to the PIT counter low register [0x40]
-    mov al, ah              ;Move the high byte of the value in ax to al
-    out 0x40, al            ;Write the high byte of the value in ax to the PIT counter high register [0x40]
-
-
- ;Initialize the Programmable Interrupt Controller (PIC)
-InitPIC:                     
-    mov al, 0x11              ;Initialize command for PIC.
-    out 0x20, al              ;PIC master command register.
-    out 0xa0, al              ;PIC slave command register.
-
-    mov al, 32                ;Set PIC master vector offset.
-    out 0x21, al              ;PIC master data register.
-    mov al, 40                ;Set PIC slave vector offset.
-    out 0xa1, al              ;PIC slave data register.
-
-    mov al, 4                 ;Configure PIC cascade.
-    out 0x21, al              ;PIC master data register.
-    mov al, 2                 ;Configure PIC cascade.
-    out 0xa1, al              ;PIC slave data register.
-
-    mov al, 1                 ;Set PIC mode (0 = 8086, 1 = 80x86).
-    out 0x21, al              ;PIC master data register.
-    out 0xa1, al              ;PIC slave data register.
-
-    mov al, 11111110b         ;Unmask all IRQs except IRQ2.
-    out 0x21, al              ;PIC master data register.
-    mov al, 11111111b         ;Unmask all IRQs on the slave PIC.
-    out 0xa1, al              ;PIC slave data register
-
-    ;sti     ;Enable interrupts
-   
-    ;Prepare for switching to 64-bit mode and call the UserEntry function.
-    push 0x18|3         ;Push the code segment selector (CS) with the 64-bit segment (0x18) and privilege level (3).
-                        ;This selector is used to access the code segment in 64-bit mode with user privileges.
-
-    push 0x7c00         ;Push the address (0x7c00) where execution will continue after switching to 64-bit mode.
-                        ;This address should be where the kernel's 64-bit entry point is located.
-
-    push 0x202          ;Push the value 0x202 onto the stack. Interrupt is enabled.
-                        
-
-    push 0x10|3         ;Push the stack segment selector (SS) with the 64-bit stack segment (0x10) and privilege level (3).
-                        ;This selector is used for the stack segment in 64-bit mode with user privileges.
-
-    push UserEntry      ;Push the address of the UserEntry label onto the stack.
-                        ;This is the entry point where execution will continue after switching to 64-bit mode.
-
-    iretq               ;The IRETQ instruction will pop the values off the stack (CS, RIP, and flags) and
-                        ;resume execution at the address specified, transitioning to 64-bit mode.
-
-;Infinite Loop - Kernel Halt
-End:
-    hlt         ;Halt the CPU.
-    jmp End     ;Infinite loop to prevent execution past the end.
-                ;Keeps the kernel running in a stable state.
-
-
-UserEntry:
-    ;Testing control is transferred between user entry and time handler:
-    inc byte[0xb8010]       ;Increment the character to signify test passed.
-
-    mov byte[0xb8011], 0xF  ;Move the color attribute (white).
-
-UEnd:
-    jmp UserEntry           ;Jump to beginning of UserEntry to loop through the code.
-                            ;This halts further execution and keeps the CPU in a stable state.
-                            
-
-Handler0:
-
-    ;Saving the state of all general-purpose registers at the start of the interrupt handler,
-    ;performs a task (in this case, displaying a character on the screen), and then restoring
-    ;the original register values before returning from the interrupt. 
-
-    ;Save the state of all general-purpose registers to preserve their values
-    push rax
-    push rbx  
-    push rcx
-    push rdx  	  
-    push rsi
-    push rdi
-    push rbp
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
-
-    ;Display the letter 'D' on the screen
-    mov byte[0xb8000],'D'      ;Move the ASCII value for 'D' into the first byte of video memory.
-                               ;0xb8000 is the start address of the text mode video memory.
-
-    mov byte[0xb8001], 0xc     ;Move the color attribute (red on black) into the second byte.
-                               ;This sets the color for the character 'D'.
-    
-   
-    jmp End      ;Skip the register restoration and jump to the end of the handler
-
-    ;Restore the state of all general-purpose registers
-    pop	r15
-    pop	r14
-    pop	r13
-    pop	r12
-    pop	r11
-    pop	r10
-    pop	r9
-    pop	r8
-    pop	rbp
-    pop	rdi
-    pop	rsi  
-    pop	rdx
-    pop	rcx
-    pop	rbx
-    pop	rax
-
-    iretq  ;Return from the interrupt handler and resume normal execution
-     
-
-Timer: 
-
-    ;Save the state of all general-purpose registers to preserve their values
-    push rax
-    push rbx  
-    push rcx
-    push rdx  	  
-    push rsi
-    push rdi
-    push rbp
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
-    
-    ;Display a changing character in a different location than 'K'
-    inc byte[0xb8020]       ;Increment character to signify multiple interrupt.
-    mov byte[0xb8021], 0xe  ;Color attribute (yellow on black).
-
-    ;Acknowledging the interrupts
-    mov al, 0x20
-    out 0x20, al           ;Write to comman register of the master
-
-    ;Restore the state of all general-purpose registers
-    pop	r15
-    pop	r14
-    pop	r13
-    pop	r12
-    pop	r11
-    pop	r10
-    pop	r9
-    pop	r8
-    pop	rbp
-    pop	rdi
-    pop	rsi  
-    pop	rdx
-    pop	rcx
-    pop	rbx
-    pop	rax
-
-    iretq   ;Return from the interrupt handler and resume normal execution
+;Data defined globally:
+section .data      
 
 ;64-bit Global Descriptor Table (GDT) Definition
 Gdt64:  
@@ -305,29 +53,6 @@ Gdt64Ptr:
     dq Gdt64                   ; Store the base address of the GDT (where it starts in memory).
 
 
-;Defining the IDT (Interrupt Descriptor Table):
-;The IDT contains 256 entries, each corresponding to an interrupt or exception.
-Idt:
-    %rep 256
-        dw 0          ;Offset bits 0-15 of the interrupt handler (initially set to 0).
-        dw 0x8        ;Segment selector: Points to the code segment in the GDT (typically 0x8).
-        db 0          ;Reserved: Must be 0.
-        db 0x8e       ;Type and attributes: 0x8E represents a 32-bit interrupt gate descriptor
-                      ;with DPL=0 (kernel privilege level) and present bit set.
-        dw 0          ;Offset bits 16-31 of the interrupt handler (initially set to 0).
-        dd 0          ;Offset bits 32-63 of the interrupt handler (initially set to 0).
-        dd 0          ;Reserved: Must be 0.
-    %endrep
-
-; Define the length of the IDT:
-;IdtLen represents the size of the IDT in bytes, calculated as the current address minus the start of the IDT.
-IdtLen: equ $-Idt
-
-;Define the IDT pointer structure:
-;IdtPtr contains the size of the IDT (IdtLen-1) and the base address of the IDT (Idt).
-IdtPtr: dw IdtLen-1   ; Limit field: Length of the IDT in bytes minus one.
-        dq Idt        ; Base field: Address of the IDT.
-
 
 ;Defining the Task State Segment (TSS) descriptor:
 Tss:
@@ -348,3 +73,99 @@ TssLen: equ $-Tss           ;Calculate the length of the TSS by subtracting the 
                             ;address (`$`). This gives the size of the TSS structure, which is used in the GDT.
 
 
+;Start of the text section, where the code resides.
+;The .text section typically contains executable instructions.
+section .text   
+extern KernelMain       ;Declare the external symbol, 'KernelMain' function is defined in another module (or file),
+                        ;linker needs to resolve this reference during linking.
+
+global start            ;The 'start' label is the entry point of the program,
+                        ;so that the linker or loader knows where to begin execution.
+
+;Kernel Start - Entry Point
+start:
+    lgdt [Gdt64Ptr]            ;Load the 64-bit Global Descriptor Table (GDT).
+                               ;This sets up the segment registers for 64-bit mode.
+   
+
+;Setting the Task State Segment (TSS):
+SetTss:
+    mov rax, Tss               ;Load the base address of the Task State Segment (TSS) into RAX register.
+                               ;This address will be used to set up the TSS descriptor.
+
+    ;Update the TSS Descriptor with the base address of the TSS.
+    mov [TssDesc + 2], ax      ;Store the lower 16 bits of the TSS base address into TssDesc+2.
+    shr rax, 16                ;Shift the base address right by 16 bits to access the next 16 bits.
+    mov [TssDesc + 4], al      ;Store these next 16 bits into TssDesc+4.
+    shr rax, 8                 ;Shift the base address right by 8 bits to access the next 8 bits.
+    mov [TssDesc + 7], al      ;Store these next 8 bits into TssDesc+7.
+    shr rax, 8                 ;Shift the base address right by 8 bits to access the final 8 bits.
+    mov [TssDesc + 8], eax     ;Store the remaining 32 bits of the base address into TssDesc+8.
+
+    mov ax, 0x20            ;Load the TSS selector (0x20) into AX register.
+                            ;This selector points to the TSS descriptor in the GDT.
+
+    ltr ax                  ;Load the Task Register (TR) with the TSS selector.
+                            ;This sets up the task state segment for task switching and other task-related operations.
+
+
+;Initialize the Programmable Interval Timer (PIT)
+InitPIT:
+    mov al, (1<<2)|(3<<4)
+    out 0x43, al            ;Write value in al to th register [mode command: 0x43]
+
+    mov ax, 11931           ;Set the PIT to generate an interrupt every 1000ms (1s)
+    out 0x40, al            ;Write the low byte of the value in ax to the PIT counter low register [0x40]
+    mov al, ah              ;Move the high byte of the value in ax to al
+    out 0x40, al            ;Write the high byte of the value in ax to the PIT counter high register [0x40]
+
+
+ ;Initialize the Programmable Interrupt Controller (PIC)
+InitPIC:                     
+    mov al, 0x11              ;Initialize command for PIC.
+    out 0x20, al              ;PIC master command register.
+    out 0xa0, al              ;PIC slave command register.
+
+    mov al, 32                ;Set PIC master vector offset.
+    out 0x21, al              ;PIC master data register.
+    mov al, 40                ;Set PIC slave vector offset.
+    out 0xa1, al              ;PIC slave data register.
+
+    mov al, 4                 ;Configure PIC cascade.
+    out 0x21, al              ;PIC master data register.
+    mov al, 2                 ;Configure PIC cascade.
+    out 0xa1, al              ;PIC slave data register.
+
+    mov al, 1                 ;Set PIC mode (0 = 8086, 1 = 80x86).
+    out 0x21, al              ;PIC master data register.
+    out 0xa1, al              ;PIC slave data register.
+
+    mov al, 11111110b         ;Unmask all IRQs except IRQ2.
+    out 0x21, al              ;PIC master data register.
+    mov al, 11111111b         ;Unmask all IRQs on the slave PIC.
+    out 0xa1, al              ;PIC slave data register
+
+    ;Transition to 64-bit Mode
+    push 8                     ; Push the code segment selector (CS) for the 64-bit code segment onto the stack.
+                               ; Selector 8 corresponds to the segment defined in the GDT.
+
+    push KernelEntry           ; Push the address of the KernelEntry label onto the stack.
+                               ; This is where execution will continue after switching to 64-bit mode.
+
+    db 0x48                    ; Emit the REX.W prefix (0x48) for a 64-bit `retf` instruction.
+                               ; REX.W is needed for a far return (retf) that pops a 64-bit address.
+
+    retf                       ; Far return: This pops the segment selector (CS) and instruction pointer (RIP) 
+                               ; from the stack, effectively jumping to the KernelEntry in 64-bit mode.
+
+
+;Kernel Entry - 64-bit Mode
+KernelEntry:
+    mov rsp, 0x200000
+    call KernelMain
+
+;Infinite Loop - Kernel Halt
+End:
+    hlt         ;Halt the CPU.
+    jmp End     ;Infinite loop to prevent execution past the end.
+                ;Keeps the kernel running in a stable state.
