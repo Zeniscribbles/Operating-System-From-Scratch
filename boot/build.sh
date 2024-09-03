@@ -33,11 +33,19 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Assemble trap.asm
+#Assemble trap.asm
 echo "Assembling trap.asm..."
 nasm -f elf64 -o trapa.o trap.asm
 if [ $? -ne 0 ]; then
   echo "Assembly of trap.asm failed."
+  exit 1
+fi
+
+#Assemble lib.asm
+echo "Assembling lib.asm..."
+nasm  -f elf64 -o liba.o lib.asm
+if [ $? -ne 0 ]; then
+  echo "Assembly of lib.asm failed."
   exit 1
 fi
 
@@ -59,8 +67,8 @@ fi
 
 
 # Link kernel.o and main.o
-echo "Linking kernel.o, main.o, and trap.o..."
-ld -nostdlib -T linker.lds -o kernel kernel.o main.o trapa.o trap.o
+echo "Linking kernel.o, main.o, trap.o, and lib.o..."
+ld -nostdlib -T linker.lds -o kernel kernel.o main.o trapa.o trap.o liba.o
 if [ $? -ne 0 ]; then
   echo "Linking failed."
   exit 1
