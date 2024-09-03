@@ -161,8 +161,12 @@ InitPIC:
 
 ;Kernel Entry - 64-bit Mode
 KernelEntry:
+    xor ax, ax
+    mov ss, ax
+    
     mov rsp, 0x200000
     call KernelMain
+    sti 
 
 ;Infinite Loop - Kernel Halt
 End:
