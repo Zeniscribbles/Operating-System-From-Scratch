@@ -33,6 +33,15 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# Assemble trap.asm
+echo "Assembling trap.asm..."
+nasm -f elf64 -o trapa.o trap.asm
+if [ $? -ne 0 ]; then
+  echo "Assembly of trap.asm failed."
+  exit 1
+fi
+
+
 #Compile main.c
 echo "Assembling main.c..."
 gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c main.c
@@ -41,14 +50,22 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "Assembling trap.c..."
+gcc -std=c99 -mcmodel=large -ffreestanding -fno-stack-protector -mno-red-zone -c trap.c
+if [ $? -ne 0 ]; then
+  echo "Compilation of trap.c failed."
+  exit 1
+fi
+
 
 # Link kernel.o and main.o
-echo "Linking kernel.o and main.o..."
-ld -nostdlib -T linker.lds -o kernel kernel.o main.o
+echo "Linking kernel.o, main.o, and trap.o..."
+ld -nostdlib -T linker.lds -o kernel kernel.o main.o trapa.o trap.o
 if [ $? -ne 0 ]; then
   echo "Linking failed."
   exit 1
 fi
+
 
 # Convert the kernel to a binary format
 echo "Converting kernel to binary format..."
@@ -79,6 +96,11 @@ if [ ! -f main.o ]; then
   echo "'main.o' not found after assembly."
   exit 1
 fi 
+
+if [ ! -f trap.o ]; then
+  echo "'trap.o' not found after assembly."
+  exit 1
+fi
 
 
 #Remove any existing boot.img file
